@@ -9,10 +9,10 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const BUCKET_NAME = "image-uploads";
 
 // Initialize Supabase Client safely
-let supabase = null;
+let supabaseClient = null;
 try {
     if (window.supabase && typeof window.supabase.createClient === "function") {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         console.log("[Image Resizer] Supabase client initialized successfully.");
     }
 } catch (e) {
@@ -267,8 +267,12 @@ async function processImageUpload() {
     }
 
     try {
-        if (!supabase) {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        if (!supabaseClient) {
+            if (window.supabase && typeof window.supabase.createClient === "function") {
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            } else {
+                throw new Error("Supabase client library failed to load.");
+            }
         }
 
         if (btnUpload) btnUpload.disabled = true;
@@ -284,7 +288,7 @@ async function processImageUpload() {
         console.log(`[Image Resizer] Uploading ${currentFile.name} to ${uploadPath}...`);
 
         // 2. Upload file to Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { data: uploadData, error: uploadError } = await supabaseClient.storage
             .from(BUCKET_NAME)
             .upload(uploadPath, currentFile, {
                 contentType: currentFile.type || "image/jpeg",
