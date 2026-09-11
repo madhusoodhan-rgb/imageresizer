@@ -295,6 +295,14 @@ body {
     color: var(--primary);
 }
 
+.selected-preview-thumb {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+}
+
 .file-details {
     display: flex;
     flex-direction: column;

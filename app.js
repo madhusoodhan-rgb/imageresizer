@@ -21,6 +21,8 @@ const dropZone = document.getElementById("dropZone");
 const dropZoneContent = document.getElementById("dropZoneContent");
 const fileInput = document.getElementById("fileInput");
 const selectedFileInfo = document.getElementById("selectedFileInfo");
+const selectedFilePreview = document.getElementById("selectedFilePreview");
+const selectedFileIcon = document.getElementById("selectedFileIcon");
 const selectedFileName = document.getElementById("selectedFileName");
 const selectedFileSize = document.getElementById("selectedFileSize");
 const btnRemoveFile = document.getElementById("btnRemoveFile");
@@ -55,34 +57,46 @@ const btnCopyJson = document.getElementById("btnCopyJson");
 // Selected File State
 let currentFile = null;
 
-// File Input Change Listener (Triggers when user selects file from native picker)
+// Ensure file input is enabled and reset
+if (fileInput) {
+    fileInput.disabled = false;
+}
+
+// Click on dropzone container -> opens native file picker
+dropZone.addEventListener("click", (e) => {
+    // Ignore if clicking remove button or fileInput itself
+    if (e.target.closest("#btnRemoveFile")) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+    }
+    if (e.target !== fileInput) {
+        console.log("[Image Resizer] Dropzone clicked -> opening native file picker");
+        fileInput.click();
+    }
+});
+
+// Stop fileInput click from bubbling back to dropZone
+fileInput.addEventListener("click", (e) => {
+    e.stopPropagation();
+});
+
+// Native file input change listener
 fileInput.addEventListener("change", (e) => {
     try {
+        console.log("[Image Resizer] Native fileInput change event triggered!", e.target.files);
         const file = e.target.files && e.target.files[0];
-        console.log("[Image Resizer] Native fileInput change event fired:", file);
         if (file) {
             handleFileSelect(file);
+        } else {
+            console.warn("[Image Resizer] fileInput change event fired with 0 files.");
         }
     } catch (err) {
         console.error("[Image Resizer] Error in fileInput change listener:", err);
     }
 });
 
-// Fallback click listener for dropZone container
-dropZone.addEventListener("click", (e) => {
-    if (e.target.closest("#btnRemoveFile")) {
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-    }
-    // If browser doesn't automatically focus file input via <label for="fileInput">
-    if (e.target !== fileInput) {
-        console.log("[Image Resizer] Dropzone clicked -> triggering fileInput.click()");
-        fileInput.click();
-    }
-});
-
-// Drag & Drop Handling
+// Drag & Drop Listeners
 ["dragenter", "dragover"].forEach((eventName) => {
     dropZone.addEventListener(eventName, (e) => {
         e.preventDefault();
@@ -162,16 +176,36 @@ function handleFileSelect(file) {
         return;
     }
 
+    // Update state
     currentFile = file;
+
+    // Update file details in UI
     selectedFileName.textContent = file.name;
     selectedFileSize.textContent = formatBytes(file.size);
 
+    // Generate instant preview thumbnail
+    try {
+        const objectUrl = URL.createObjectURL(file);
+        if (selectedFilePreview) {
+            selectedFilePreview.src = objectUrl;
+            selectedFilePreview.classList.remove("hidden");
+        }
+        if (selectedFileIcon) {
+            selectedFileIcon.classList.add("hidden");
+        }
+    } catch (err) {
+        console.warn("[Image Resizer] Could not create ObjectURL for preview:", err);
+    }
+
+    // Update UI visibility
     dropZoneContent.classList.add("hidden");
     selectedFileInfo.classList.remove("hidden");
+
+    // Enable Upload Button
     btnUpload.disabled = false;
     hideAlert();
 
-    console.log("[Image Resizer] Selected file attached. Upload button enabled.");
+    console.log("[Image Resizer] File selection successful! Upload & Resize button is ENABLED.");
 }
 
 function resetFileSelection() {
@@ -180,6 +214,14 @@ function resetFileSelection() {
     fileInput.value = "";
     selectedFileName.textContent = "";
     selectedFileSize.textContent = "";
+
+    if (selectedFilePreview) {
+        selectedFilePreview.src = "";
+        selectedFilePreview.classList.add("hidden");
+    }
+    if (selectedFileIcon) {
+        selectedFileIcon.classList.remove("hidden");
+    }
 
     dropZoneContent.classList.remove("hidden");
     selectedFileInfo.classList.add("hidden");

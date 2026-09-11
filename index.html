@@ -58,8 +58,9 @@
                     <span class="badge">JPG / PNG / WEBP</span>
                 </div>
 
-                <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;">
-                <label for="fileInput" class="drop-zone" id="dropZone">
+                <div class="drop-zone" id="dropZone">
+                    <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" style="display: none;">
+                    
                     <div class="drop-zone-content" id="dropZoneContent">
                         <div class="icon-circle">
                             <i class="fa-solid fa-images"></i>
@@ -71,7 +72,8 @@
                     
                     <!-- Selected File Bar -->
                     <div class="selected-file-info hidden" id="selectedFileInfo">
-                        <i class="fa-solid fa-file-image file-icon"></i>
+                        <img id="selectedFilePreview" src="" alt="Selected Preview" class="selected-preview-thumb hidden">
+                        <i class="fa-solid fa-file-image file-icon" id="selectedFileIcon"></i>
                         <div class="file-details">
                             <span class="filename" id="selectedFileName">filename.jpg</span>
                             <span class="filesize" id="selectedFileSize">0 KB</span>
@@ -80,7 +82,7 @@
                             <i class="fa-solid fa-xmark"></i>
                         </button>
                     </div>
-                </label>
+                </div>
 
                 <div class="upload-actions">
                     <button type="button" class="btn-primary" id="btnUpload" disabled>
