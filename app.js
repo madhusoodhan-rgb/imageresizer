@@ -13,12 +13,10 @@ let supabase = null;
 try {
     if (window.supabase && typeof window.supabase.createClient === "function") {
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log("[DEBUG] Supabase client initialized successfully.");
-    } else {
-        console.warn("[DEBUG] window.supabase not available yet.");
+        console.log("[Image Resizer] Supabase client initialized successfully.");
     }
 } catch (e) {
-    console.error("[DEBUG] Error initializing Supabase client:", e);
+    console.error("[Image Resizer] Error initializing Supabase client:", e);
 }
 
 // DOM Elements
@@ -31,6 +29,13 @@ const selectedFileIcon = document.getElementById("selectedFileIcon");
 const selectedFileName = document.getElementById("selectedFileName");
 const selectedFileSize = document.getElementById("selectedFileSize");
 const btnRemoveFile = document.getElementById("btnRemoveFile");
+
+const selectedFileCard = document.getElementById("selectedFileCard");
+const selectedImageLargePreview = document.getElementById("selectedImageLargePreview");
+const selectedImageCardName = document.getElementById("selectedImageCardName");
+const selectedImageCardSize = document.getElementById("selectedImageCardSize");
+const btnRemoveFileCard = document.getElementById("btnRemoveFileCard");
+
 const btnUpload = document.getElementById("btnUpload");
 
 const statusContainer = document.getElementById("statusContainer");
@@ -62,54 +67,142 @@ const btnCopyJson = document.getElementById("btnCopyJson");
 // Selected File State
 let currentFile = null;
 
-// Ensure fileInput exists and is enabled
+// Ensure file input is enabled
 if (fileInput) {
     fileInput.disabled = false;
-    console.log("[DEBUG] fileInput initialized. disabled =", fileInput.disabled);
-} else {
-    console.error("[DEBUG] fileInput element NOT FOUND in DOM!");
 }
 
-// Click on dropzone container -> opens native file picker
+// ----------------------------------------------------------------------------
+// SINGLE UNIFIED FILE SELECTION HANDLER (STEP 3 & STEP 5)
+// ----------------------------------------------------------------------------
+function handleSelectedFile(file) {
+    if (!file) {
+        console.warn("[Image Resizer] handleSelectedFile called with empty/null file.");
+        return;
+    }
+
+    // Step 7: Required Debug Logs
+    console.log("[Image Resizer] File input change fired");
+    console.log("[Image Resizer] Selected file:", file);
+    console.log("[Image Resizer] File name:", file?.name);
+    console.log("[Image Resizer] File type:", file?.type);
+    console.log("[Image Resizer] File size:", file?.size);
+
+    // Validate MIME type & file extension
+    const validMimes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
+    const isExtValid = /\.(jpg|jpeg|png|webp)$/i.test(file.name);
+    const isMimeValid = file.type ? validMimes.includes(file.type.toLowerCase()) : false;
+
+    if (!isExtValid && !isMimeValid) {
+        const errMsg = `Invalid file type for "${file.name}". Please select a JPG, PNG, or WEBP image.`;
+        console.error(`[Image Resizer] ${errMsg}`);
+        showAlert("error", errMsg);
+        return;
+    }
+
+    // Validate size (< 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+        const errMsg = `File size (${formatBytes(file.size)}) exceeds 10MB limit.`;
+        console.error(`[Image Resizer] ${errMsg}`);
+        showAlert("error", errMsg);
+        return;
+    }
+
+    // Store File object in application state
+    currentFile = file;
+
+    // STEP 4: Display selected image & filename
+    if (selectedFileName) selectedFileName.textContent = file.name;
+    if (selectedFileSize) selectedFileSize.textContent = formatBytes(file.size);
+    if (selectedImageCardName) selectedImageCardName.textContent = file.name;
+    if (selectedImageCardSize) selectedImageCardSize.textContent = formatBytes(file.size);
+
+    // Generate ObjectURL preview
+    try {
+        const objectUrl = URL.createObjectURL(file);
+        if (selectedFilePreview) {
+            selectedFilePreview.src = objectUrl;
+            selectedFilePreview.classList.remove("hidden");
+        }
+        if (selectedImageLargePreview) {
+            selectedImageLargePreview.src = objectUrl;
+        }
+        if (selectedFileCard) {
+            selectedFileCard.classList.remove("hidden");
+        }
+    } catch (err) {
+        console.error("[Image Resizer] Error creating preview ObjectURL:", err);
+    }
+
+    if (selectedFileIcon) selectedFileIcon.classList.add("hidden");
+    if (dropZoneContent) dropZoneContent.classList.add("hidden");
+    if (selectedFileInfo) selectedFileInfo.classList.remove("hidden");
+
+    // Enable Upload & Resize Image Button
+    if (btnUpload) {
+        btnUpload.disabled = false;
+        console.log("[Image Resizer] Upload & Resize button enabled!");
+    }
+
+    hideAlert();
+}
+
+// Reset File Selection
+function resetFileSelection() {
+    console.log("[Image Resizer] Resetting file selection.");
+    currentFile = null;
+    if (fileInput) fileInput.value = "";
+    if (selectedFileName) selectedFileName.textContent = "";
+    if (selectedFileSize) selectedFileSize.textContent = "";
+
+    if (selectedFilePreview) {
+        selectedFilePreview.src = "";
+        selectedFilePreview.classList.add("hidden");
+    }
+    if (selectedImageLargePreview) {
+        selectedImageLargePreview.src = "";
+    }
+    if (selectedFileIcon) {
+        selectedFileIcon.classList.remove("hidden");
+    }
+
+    if (dropZoneContent) dropZoneContent.classList.remove("hidden");
+    if (selectedFileInfo) selectedFileInfo.classList.add("hidden");
+    if (selectedFileCard) selectedFileCard.classList.add("hidden");
+    if (btnUpload) btnUpload.disabled = true;
+    hideAlert();
+    if (resultsSection) resultsSection.classList.add("hidden");
+}
+
+// ----------------------------------------------------------------------------
+// EVENT LISTENERS WIRING
+// ----------------------------------------------------------------------------
+
+// File Input Change Listener
+if (fileInput) {
+    fileInput.addEventListener("change", (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (file) {
+            handleSelectedFile(file);
+        }
+    });
+}
+
+// Dropzone Click Listener -> Triggers fileInput.click()
 if (dropZone) {
-    dropZone.addEventListener("click", (e) => {
-        if (e.target && e.target.closest("#btnRemoveFile")) {
-            e.preventDefault();
-            e.stopPropagation();
+    dropZone.addEventListener("click", (event) => {
+        if (event.target && event.target.closest("#btnRemoveFile")) {
+            event.preventDefault();
+            event.stopPropagation();
             return;
         }
-        if (fileInput) {
-            console.log("[DEBUG] dropzone clicked -> calling fileInput.click()");
+        if (fileInput && event.target !== fileInput) {
+            console.log("[Image Resizer] Dropzone clicked -> fileInput.click()");
             fileInput.click();
         }
     });
-} else {
-    console.error("[DEBUG] dropZone element NOT FOUND in DOM!");
-}
 
-// Prevent click bubbling on fileInput
-if (fileInput) {
-    fileInput.addEventListener("click", (e) => {
-        e.stopPropagation();
-    });
-
-    // Native file input change listener with required diagnostic logging
-    fileInput.addEventListener("change", (e) => {
-        console.log("[DEBUG] file input change fired");
-        console.log("[DEBUG] files:", e.target.files);
-        console.log("[DEBUG] selected file:", e.target.files?.[0]);
-
-        const file = e.target.files && e.target.files[0];
-        if (file) {
-            handleFileSelect(file);
-        } else {
-            console.warn("[DEBUG] file input change fired but no file present.");
-        }
-    });
-}
-
-// Drag & Drop Listeners
-if (dropZone) {
+    // Drag & Drop
     ["dragenter", "dragover"].forEach((eventName) => {
         dropZone.addEventListener(eventName, (e) => {
             e.preventDefault();
@@ -126,21 +219,18 @@ if (dropZone) {
         });
     });
 
-    dropZone.addEventListener("drop", (e) => {
-        try {
-            e.preventDefault();
-            e.stopPropagation();
-            const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-            console.log("[DEBUG] file dropped:", file);
-            if (file) {
-                handleFileSelect(file);
-            }
-        } catch (err) {
-            console.error("[DEBUG] Error handling dropped file:", err);
+    dropZone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+        if (file) {
+            console.log("[Image Resizer] File dropped via drag-and-drop");
+            handleSelectedFile(file);
         }
     });
 }
 
+// Remove File Buttons
 if (btnRemoveFile) {
     btnRemoveFile.addEventListener("click", (e) => {
         e.preventDefault();
@@ -149,6 +239,15 @@ if (btnRemoveFile) {
     });
 }
 
+if (btnRemoveFileCard) {
+    btnRemoveFileCard.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        resetFileSelection();
+    });
+}
+
+// Upload Button
 if (btnUpload) {
     btnUpload.addEventListener("click", (e) => {
         e.preventDefault();
@@ -157,6 +256,7 @@ if (btnUpload) {
     });
 }
 
+// Copy JSON Button
 if (btnCopyJson) {
     btnCopyJson.addEventListener("click", () => {
         if (jsonOutput) {
@@ -169,100 +269,12 @@ if (btnCopyJson) {
     });
 }
 
-// File Selection Handler
-function handleFileSelect(file) {
-    console.log("[DEBUG] handleFileSelect received file:", file);
-    if (!file) {
-        console.error("[DEBUG] handleFileSelect called with invalid/null file.");
-        return;
-    }
-
-    console.log(`[DEBUG] Processing file: ${file.name} (${file.size} bytes, type: ${file.type})`);
-
-    // Validate MIME type & file extension
-    const validMimes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
-    const isExtValid = /\.(jpg|jpeg|png|webp)$/i.test(file.name);
-    const isMimeValid = file.type ? validMimes.includes(file.type.toLowerCase()) : false;
-
-    console.log("[DEBUG] File validation result:", { name: file.name, isExtValid, isMimeValid });
-
-    if (!isExtValid && !isMimeValid) {
-        const errMsg = `Invalid file type for "${file.name}". Please select a JPG, PNG, or WEBP image.`;
-        console.error(`[DEBUG] Validation Error: ${errMsg}`);
-        showAlert("error", errMsg);
-        return;
-    }
-
-    // Validate size (< 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-        const errMsg = `File size (${formatBytes(file.size)}) exceeds 10MB limit.`;
-        console.error(`[DEBUG] Validation Error: ${errMsg}`);
-        showAlert("error", errMsg);
-        return;
-    }
-
-    // Store in application state variable
-    currentFile = file;
-
-    // Update UI text details
-    if (selectedFileName) selectedFileName.textContent = file.name;
-    if (selectedFileSize) selectedFileSize.textContent = formatBytes(file.size);
-
-    // Generate instant preview thumbnail
-    if (selectedFilePreview) {
-        try {
-            const objectUrl = URL.createObjectURL(file);
-            selectedFilePreview.src = objectUrl;
-            selectedFilePreview.classList.remove("hidden");
-            console.log("[DEBUG] Instant preview ObjectURL set:", objectUrl);
-        } catch (err) {
-            console.warn("[DEBUG] Error generating ObjectURL for preview:", err);
-        }
-    }
-    if (selectedFileIcon) {
-        selectedFileIcon.classList.add("hidden");
-    }
-
-    // Update UI visibility
-    if (dropZoneContent) dropZoneContent.classList.add("hidden");
-    if (selectedFileInfo) selectedFileInfo.classList.remove("hidden");
-
-    // Enable Upload & Resize Image button
-    if (btnUpload) {
-        btnUpload.disabled = false;
-        console.log("[DEBUG] Upload button enabled: btnUpload.disabled =", btnUpload.disabled);
-    }
-
-    hideAlert();
-    console.log("[DEBUG] handleFileSelect complete. UI successfully updated.");
-}
-
-function resetFileSelection() {
-    console.log("[DEBUG] Resetting file selection.");
-    currentFile = null;
-    if (fileInput) fileInput.value = "";
-    if (selectedFileName) selectedFileName.textContent = "";
-    if (selectedFileSize) selectedFileSize.textContent = "";
-
-    if (selectedFilePreview) {
-        selectedFilePreview.src = "";
-        selectedFilePreview.classList.add("hidden");
-    }
-    if (selectedFileIcon) {
-        selectedFileIcon.classList.remove("hidden");
-    }
-
-    if (dropZoneContent) dropZoneContent.classList.remove("hidden");
-    if (selectedFileInfo) selectedFileInfo.classList.add("hidden");
-    if (btnUpload) btnUpload.disabled = true;
-    hideAlert();
-    if (resultsSection) resultsSection.classList.add("hidden");
-}
-
-// Upload & Process Workflow
+// ----------------------------------------------------------------------------
+// UPLOAD & PROCESS WORKFLOW
+// ----------------------------------------------------------------------------
 async function processImageUpload() {
     if (!currentFile) {
-        console.error("[DEBUG] processImageUpload called without currentFile.");
+        console.error("[Image Resizer] processImageUpload called without currentFile.");
         return;
     }
 
@@ -281,7 +293,7 @@ async function processImageUpload() {
         const sanitizedName = fileNameWithoutExt.replace(/[^a-zA-Z0-9_-]/g, "_");
         const uploadPath = `uploads/${sanitizedName}_${Date.now()}.${fileExt}`;
 
-        console.log(`[DEBUG] Uploading ${currentFile.name} to ${uploadPath}...`);
+        console.log(`[Image Resizer] Uploading ${currentFile.name} to ${uploadPath}...`);
 
         // 2. Upload file to Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -295,7 +307,7 @@ async function processImageUpload() {
             throw new Error(`Storage upload failed: ${uploadError.message}`);
         }
 
-        console.log(`[DEBUG] Upload success. Remote path: ${uploadData.path}`);
+        console.log(`[Image Resizer] Storage upload success. Path: ${uploadData.path}`);
         showStatus("Invoking Edge Function 'image-resizer'...", 60);
 
         // 3. Invoke Supabase Edge Function 'image-resizer'
@@ -318,7 +330,7 @@ async function processImageUpload() {
             throw new Error(result.error || result.details || "Edge function processing failed.");
         }
 
-        console.log("[DEBUG] Edge Function returned success:", result);
+        console.log("[Image Resizer] Edge Function returned success:", result);
         showStatus("Processing complete! Rendering metrics...", 100);
 
         // 4. Render Results
@@ -326,7 +338,7 @@ async function processImageUpload() {
         showAlert("success", "Image successfully uploaded, resized to max 1200px, and compressed!");
 
     } catch (err) {
-        console.error("[DEBUG] Processing Error:", err);
+        console.error("[Image Resizer] Processing Error:", err);
         showAlert("error", err.message || "An unexpected error occurred.");
     } finally {
         setTimeout(() => {

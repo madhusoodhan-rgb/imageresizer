@@ -84,6 +84,21 @@
                     </div>
                 </div>
 
+                <!-- Instant Selected Image Preview Card -->
+                <div class="selected-file-preview-card hidden" id="selectedFileCard">
+                    <div class="preview-header">
+                        <span class="preview-title"><i class="fa-solid fa-image"></i> Selected Image Ready for Upload</span>
+                        <button type="button" class="btn-remove-sm" id="btnRemoveFileCard"><i class="fa-solid fa-xmark"></i> Remove</button>
+                    </div>
+                    <div class="preview-body">
+                        <img id="selectedImageLargePreview" src="" alt="Selected Image Preview">
+                    </div>
+                    <div class="preview-footer">
+                        <span id="selectedImageCardName">filename.jpg</span>
+                        <span id="selectedImageCardSize">0 KB</span>
+                    </div>
+                </div>
+
                 <div class="upload-actions">
                     <button type="button" class="btn-primary" id="btnUpload" disabled>
                         <i class="fa-solid fa-bolt"></i> Upload & Resize Image
