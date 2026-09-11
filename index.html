@@ -58,8 +58,8 @@
                     <span class="badge">JPG / PNG / WEBP</span>
                 </div>
 
-                <div class="drop-zone" id="dropZone">
-                    <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" hidden>
+                <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;">
+                <label for="fileInput" class="drop-zone" id="dropZone">
                     <div class="drop-zone-content" id="dropZoneContent">
                         <div class="icon-circle">
                             <i class="fa-solid fa-images"></i>
@@ -80,7 +80,7 @@
                             <i class="fa-solid fa-xmark"></i>
                         </button>
                     </div>
-                </div>
+                </label>
 
                 <div class="upload-actions">
                     <button type="button" class="btn-primary" id="btnUpload" disabled>

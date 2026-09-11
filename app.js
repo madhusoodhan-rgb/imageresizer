@@ -9,7 +9,12 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const BUCKET_NAME = "image-uploads";
 
 // Initialize Supabase Client
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let supabase;
+try {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch (e) {
+    console.error("[Image Resizer] Error initializing Supabase client:", e);
+}
 
 // DOM Elements
 const dropZone = document.getElementById("dropZone");
@@ -50,14 +55,38 @@ const btnCopyJson = document.getElementById("btnCopyJson");
 // Selected File State
 let currentFile = null;
 
-// Event Listeners
-dropZone.addEventListener("click", () => fileInput.click());
-fileInput.addEventListener("change", (e) => handleFileSelect(e.target.files[0]));
+// File Input Change Listener (Triggers when user selects file from native picker)
+fileInput.addEventListener("change", (e) => {
+    try {
+        const file = e.target.files && e.target.files[0];
+        console.log("[Image Resizer] Native fileInput change event fired:", file);
+        if (file) {
+            handleFileSelect(file);
+        }
+    } catch (err) {
+        console.error("[Image Resizer] Error in fileInput change listener:", err);
+    }
+});
 
-// Drag & Drop
+// Fallback click listener for dropZone container
+dropZone.addEventListener("click", (e) => {
+    if (e.target.closest("#btnRemoveFile")) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+    }
+    // If browser doesn't automatically focus file input via <label for="fileInput">
+    if (e.target !== fileInput) {
+        console.log("[Image Resizer] Dropzone clicked -> triggering fileInput.click()");
+        fileInput.click();
+    }
+});
+
+// Drag & Drop Handling
 ["dragenter", "dragover"].forEach((eventName) => {
     dropZone.addEventListener(eventName, (e) => {
         e.preventDefault();
+        e.stopPropagation();
         dropZone.classList.add("dragover");
     });
 });
@@ -65,21 +94,36 @@ fileInput.addEventListener("change", (e) => handleFileSelect(e.target.files[0]))
 ["dragleave", "drop"].forEach((eventName) => {
     dropZone.addEventListener(eventName, (e) => {
         e.preventDefault();
+        e.stopPropagation();
         dropZone.classList.remove("dragover");
     });
 });
 
 dropZone.addEventListener("drop", (e) => {
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileSelect(file);
+    try {
+        e.preventDefault();
+        e.stopPropagation();
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) {
+            console.log("[Image Resizer] File dropped:", file.name, file.size, file.type);
+            handleFileSelect(file);
+        }
+    } catch (err) {
+        console.error("[Image Resizer] Error in drop listener:", err);
+    }
 });
 
 btnRemoveFile.addEventListener("click", (e) => {
+    e.preventDefault();
     e.stopPropagation();
     resetFileSelection();
 });
 
-btnUpload.addEventListener("click", processImageUpload);
+btnUpload.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    processImageUpload();
+});
 
 btnCopyJson.addEventListener("click", () => {
     navigator.clipboard.writeText(jsonOutput.innerText);
@@ -91,18 +135,30 @@ btnCopyJson.addEventListener("click", () => {
 
 // File Selection Handler
 function handleFileSelect(file) {
-    if (!file) return;
+    if (!file) {
+        console.error("[Image Resizer] handleFileSelect received null/undefined file.");
+        return;
+    }
 
-    // Validate MIME type
-    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
-    if (!validTypes.includes(file.type.toLowerCase())) {
-        showAlert("error", "Invalid file type. Please select a JPG, PNG, or WEBP image.");
+    console.log(`[Image Resizer] Processing file selection: ${file.name} (${file.size} bytes, type: ${file.type})`);
+
+    // Validate MIME type & file extension
+    const validMimes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
+    const isExtValid = /\.(jpg|jpeg|png|webp)$/i.test(file.name);
+    const isMimeValid = file.type ? validMimes.includes(file.type.toLowerCase()) : false;
+
+    if (!isExtValid && !isMimeValid) {
+        const errMsg = `Invalid file type for "${file.name}". Please select a JPG, PNG, or WEBP image.`;
+        console.error(`[Image Resizer] Validation Error: ${errMsg}`);
+        showAlert("error", errMsg);
         return;
     }
 
     // Validate size (< 10MB)
     if (file.size > 10 * 1024 * 1024) {
-        showAlert("error", "File size exceeds 10MB limit.");
+        const errMsg = `File size (${formatBytes(file.size)}) exceeds 10MB limit.`;
+        console.error(`[Image Resizer] Validation Error: ${errMsg}`);
+        showAlert("error", errMsg);
         return;
     }
 
@@ -114,9 +170,12 @@ function handleFileSelect(file) {
     selectedFileInfo.classList.remove("hidden");
     btnUpload.disabled = false;
     hideAlert();
+
+    console.log("[Image Resizer] Selected file attached. Upload button enabled.");
 }
 
 function resetFileSelection() {
+    console.log("[Image Resizer] Resetting file selection.");
     currentFile = null;
     fileInput.value = "";
     selectedFileName.textContent = "";
@@ -131,7 +190,10 @@ function resetFileSelection() {
 
 // Upload & Process Workflow
 async function processImageUpload() {
-    if (!currentFile) return;
+    if (!currentFile) {
+        console.error("[Image Resizer] processImageUpload called without currentFile.");
+        return;
+    }
 
     try {
         btnUpload.disabled = true;
@@ -144,11 +206,13 @@ async function processImageUpload() {
         const sanitizedName = fileNameWithoutExt.replace(/[^a-zA-Z0-9_-]/g, "_");
         const uploadPath = `uploads/${sanitizedName}_${Date.now()}.${fileExt}`;
 
+        console.log(`[Image Resizer] Uploading ${currentFile.name} to ${uploadPath}...`);
+
         // 2. Upload file to Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
             .from(BUCKET_NAME)
             .upload(uploadPath, currentFile, {
-                contentType: currentFile.type,
+                contentType: currentFile.type || "image/jpeg",
                 upsert: true,
             });
 
@@ -156,6 +220,7 @@ async function processImageUpload() {
             throw new Error(`Storage upload failed: ${uploadError.message}`);
         }
 
+        console.log(`[Image Resizer] Upload success. Remote path: ${uploadData.path}`);
         showStatus("Invoking Edge Function 'image-resizer'...", 60);
 
         // 3. Invoke Supabase Edge Function 'image-resizer'
@@ -178,6 +243,7 @@ async function processImageUpload() {
             throw new Error(result.error || result.details || "Edge function processing failed.");
         }
 
+        console.log("[Image Resizer] Edge Function returned success:", result);
         showStatus("Processing complete! Rendering metrics...", 100);
 
         // 4. Render Results
@@ -185,7 +251,7 @@ async function processImageUpload() {
         showAlert("success", "Image successfully uploaded, resized to max 1200px, and compressed!");
 
     } catch (err) {
-        console.error("Error during processing:", err);
+        console.error("[Image Resizer] Processing Error:", err);
         showAlert("error", err.message || "An unexpected error occurred.");
     } finally {
         setTimeout(() => {
