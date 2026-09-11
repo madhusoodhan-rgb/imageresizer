@@ -181,6 +181,7 @@ function resetFileSelection() {
 // File Input Change Listener
 if (fileInput) {
     fileInput.addEventListener("change", (event) => {
+        console.log("[Image Resizer] File input change fired");
         const file = event.target.files && event.target.files[0];
         if (file) {
             handleSelectedFile(file);
@@ -188,21 +189,8 @@ if (fileInput) {
     });
 }
 
-// Dropzone Click Listener -> Triggers fileInput.click()
+// Drag & Drop Handling on Dropzone
 if (dropZone) {
-    dropZone.addEventListener("click", (event) => {
-        if (event.target && event.target.closest("#btnRemoveFile")) {
-            event.preventDefault();
-            event.stopPropagation();
-            return;
-        }
-        if (fileInput && event.target !== fileInput) {
-            console.log("[Image Resizer] Dropzone clicked -> fileInput.click()");
-            fileInput.click();
-        }
-    });
-
-    // Drag & Drop
     ["dragenter", "dragover"].forEach((eventName) => {
         dropZone.addEventListener(eventName, (e) => {
             e.preventDefault();
