@@ -1,0 +1,14 @@
+{
+  "name": "image-resizer-cloud-project",
+  "version": "1.0.0",
+  "description": "Supabase Storage + Deno Edge Functions Image Resizer Project (Madhu Soodhan S - 24UG00211)",
+  "main": "app.js",
+  "scripts": {
+    "dev": "npx -y http-server . -p 8080",
+    "start": "npx -y http-server . -p 8080",
+    "test": "node test_workflow.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}

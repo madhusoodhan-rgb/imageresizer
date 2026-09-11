@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Resizer - Supabase Cloud Computing Assignment</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="background-globes">
+        <div class="globe globe-1"></div>
+        <div class="globe globe-2"></div>
+        <div class="globe globe-3"></div>
+    </div>
+
+    <div class="container">
+        <!-- Header Section -->
+        <header class="app-header">
+            <div class="brand-badge">
+                <i class="fa-solid fa-cloud-bolt"></i> Supabase Cloud Computing Project
+            </div>
+            <h1>Image Resizer & Compressor</h1>
+            <p class="subtitle">Automated cloud storage image processing pipeline using Supabase Storage & Deno Edge Functions</p>
+            
+            <!-- Student Information Card -->
+            <div class="student-card">
+                <div class="student-info-item">
+                    <span class="label"><i class="fa-solid fa-user-graduate"></i> Student Name</span>
+                    <span class="valueHighlight">Madhu Soodhan S</span>
+                </div>
+                <div class="divider"></div>
+                <div class="student-info-item">
+                    <span class="label"><i class="fa-solid fa-id-card"></i> Register Number</span>
+                    <span class="valueHighlight">24UG00211</span>
+                </div>
+                <div class="divider"></div>
+                <div class="student-info-item">
+                    <span class="label"><i class="fa-solid fa-layer-group"></i> Architecture</span>
+                    <span class="value">Storage + Edge Function</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Upload & Control Card -->
+        <main class="main-content">
+            <section class="upload-section card">
+                <div class="section-title">
+                    <h2><i class="fa-solid fa-cloud-arrow-up"></i> Upload Image</h2>
+                    <span class="badge">JPG / PNG / WEBP</span>
+                </div>
+
+                <div class="drop-zone" id="dropZone">
+                    <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" hidden>
+                    <div class="drop-zone-content" id="dropZoneContent">
+                        <div class="icon-circle">
+                            <i class="fa-solid fa-images"></i>
+                        </div>
+                        <h3>Drag & drop your image here</h3>
+                        <p>or click to browse from your device (Max 10MB)</p>
+                        <span class="file-types-hint">Supported formats: .jpg, .jpeg, .png, .webp</span>
+                    </div>
+                    
+                    <!-- Selected File Bar -->
+                    <div class="selected-file-info hidden" id="selectedFileInfo">
+                        <i class="fa-solid fa-file-image file-icon"></i>
+                        <div class="file-details">
+                            <span class="filename" id="selectedFileName">filename.jpg</span>
+                            <span class="filesize" id="selectedFileSize">0 KB</span>
+                        </div>
+                        <button type="button" class="btn-remove" id="btnRemoveFile" title="Remove file">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="upload-actions">
+                    <button type="button" class="btn-primary" id="btnUpload" disabled>
+                        <i class="fa-solid fa-bolt"></i> Upload & Resize Image
+                    </button>
+                </div>
+
+                <!-- Progress & Status Bar -->
+                <div class="status-container hidden" id="statusContainer">
+                    <div class="status-header">
+                        <span class="status-text" id="statusText">Processing...</span>
+                        <span class="status-percentage" id="statusPercentage">0%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="progressBarFill"></div>
+                    </div>
+                </div>
+
+                <!-- Alert Messages -->
+                <div class="alert hidden" id="alertBox">
+                    <i class="alert-icon fa-solid fa-circle-info"></i>
+                    <span class="alert-message" id="alertMessage"></span>
+                </div>
+            </section>
+
+            <!-- Results Section (Hidden until processed) -->
+            <section class="results-section hidden" id="resultsSection">
+                <!-- Summary Metrics Banner -->
+                <div class="metrics-summary-grid">
+                    <div class="metric-card highlight">
+                        <div class="metric-icon"><i class="fa-solid fa-file-arrow-down"></i></div>
+                        <div class="metric-body">
+                            <span class="metric-label">Space Saved</span>
+                            <span class="metric-value" id="summarySpaceSaved">0%</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-icon"><i class="fa-solid fa-weight-hanging"></i></div>
+                        <div class="metric-body">
+                            <span class="metric-label">Size Saved</span>
+                            <span class="metric-value" id="summarySizeSaved">0 KB</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-icon"><i class="fa-solid fa-expand"></i></div>
+                        <div class="metric-body">
+                            <span class="metric-label">Max Width Limit</span>
+                            <span class="metric-value">1200 px</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-icon"><i class="fa-solid fa-circle-check"></i></div>
+                        <div class="metric-body">
+                            <span class="metric-label">Status</span>
+                            <span class="metric-value success-text">Optimized</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Side-by-Side Image Comparison Cards -->
+                <div class="comparison-grid">
+                    <!-- Original Image Card -->
+                    <div class="image-card original-card">
+                        <div class="image-card-header">
+                            <h3><i class="fa-solid fa-image"></i> Original Image</h3>
+                            <span class="badge-tag danger">Uncompressed</span>
+                        </div>
+                        <div class="image-wrapper">
+                            <img id="imgOriginalPreview" src="" alt="Original Image Preview">
+                        </div>
+                        <div class="image-meta">
+                            <div class="meta-row">
+                                <span class="meta-label">File Size:</span>
+                                <span class="meta-value" id="metaOrigSize">0 KB</span>
+                            </div>
+                            <div class="meta-row">
+                                <span class="meta-label">Dimensions:</span>
+                                <span class="meta-value" id="metaOrigDimensions">0 x 0</span>
+                            </div>
+                            <div class="meta-row">
+                                <span class="meta-label">Storage Path:</span>
+                                <span class="meta-value code-path" id="metaOrigPath">uploads/sample.jpg</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Optimized Image Card -->
+                    <div class="image-card optimized-card">
+                        <div class="image-card-header">
+                            <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Optimized Image</h3>
+                            <span class="badge-tag success" id="badgeCompression">-0%</span>
+                        </div>
+                        <div class="image-wrapper">
+                            <img id="imgOptimizedPreview" src="" alt="Optimized Image Preview">
+                        </div>
+                        <div class="image-meta">
+                            <div class="meta-row">
+                                <span class="meta-label">Optimized Size:</span>
+                                <span class="meta-value text-success" id="metaOptSize">0 KB</span>
+                            </div>
+                            <div class="meta-row">
+                                <span class="meta-label">Dimensions:</span>
+                                <span class="meta-value" id="metaOptDimensions">0 x 0</span>
+                            </div>
+                            <div class="meta-row">
+                                <span class="meta-label">Storage Path:</span>
+                                <span class="meta-value code-path" id="metaOptPath">optimized/sample-optimized.jpg</span>
+                            </div>
+                        </div>
+                        <div class="card-footer-action">
+                            <a id="btnDownloadOptimized" href="#" target="_blank" class="btn-secondary">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Full Optimized Image
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API Metrics Response Details -->
+                <div class="card json-card">
+                    <div class="json-header">
+                        <span class="json-title"><i class="fa-solid fa-code"></i> Edge Function JSON Response</span>
+                        <button class="btn-copy" id="btnCopyJson"><i class="fa-regular fa-copy"></i> Copy JSON</button>
+                    </div>
+                    <pre><code id="jsonOutput">{}</code></pre>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Cloud Computing Assignment &bull; Built with Supabase Storage & Supabase Edge Functions (Deno)</p>
+            <p class="sub-footer">Madhu Soodhan S &bull; Reg: 24UG00211</p>
+        </footer>
+    </div>
+
+    <!-- Custom App JS -->
+    <script src="app.js"></script>
+</body>
+</html>
