@@ -8,12 +8,17 @@ const SUPABASE_URL = "https://tkrywxnqlitacdfwtwou.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrcnl3eG5xbGl0YWNkZnd0d291Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwODgwMzIsImV4cCI6MjEwNDY2NDAzMn0.IiQpFFFxQvTJertl9E6JNy61BxF8qdWxf9N71GYqXMo";
 const BUCKET_NAME = "image-uploads";
 
-// Initialize Supabase Client
-let supabase;
+// Initialize Supabase Client safely
+let supabase = null;
 try {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    if (window.supabase && typeof window.supabase.createClient === "function") {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log("[DEBUG] Supabase client initialized successfully.");
+    } else {
+        console.warn("[DEBUG] window.supabase not available yet.");
+    }
 } catch (e) {
-    console.error("[Image Resizer] Error initializing Supabase client:", e);
+    console.error("[DEBUG] Error initializing Supabase client:", e);
 }
 
 // DOM Elements
@@ -57,113 +62,133 @@ const btnCopyJson = document.getElementById("btnCopyJson");
 // Selected File State
 let currentFile = null;
 
-// Ensure file input is enabled and reset
+// Ensure fileInput exists and is enabled
 if (fileInput) {
     fileInput.disabled = false;
+    console.log("[DEBUG] fileInput initialized. disabled =", fileInput.disabled);
+} else {
+    console.error("[DEBUG] fileInput element NOT FOUND in DOM!");
 }
 
 // Click on dropzone container -> opens native file picker
-dropZone.addEventListener("click", (e) => {
-    // Ignore if clicking remove button or fileInput itself
-    if (e.target.closest("#btnRemoveFile")) {
-        e.preventDefault();
+if (dropZone) {
+    dropZone.addEventListener("click", (e) => {
+        if (e.target && e.target.closest("#btnRemoveFile")) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
+        if (fileInput) {
+            console.log("[DEBUG] dropzone clicked -> calling fileInput.click()");
+            fileInput.click();
+        }
+    });
+} else {
+    console.error("[DEBUG] dropZone element NOT FOUND in DOM!");
+}
+
+// Prevent click bubbling on fileInput
+if (fileInput) {
+    fileInput.addEventListener("click", (e) => {
         e.stopPropagation();
-        return;
-    }
-    if (e.target !== fileInput) {
-        console.log("[Image Resizer] Dropzone clicked -> opening native file picker");
-        fileInput.click();
-    }
-});
+    });
 
-// Stop fileInput click from bubbling back to dropZone
-fileInput.addEventListener("click", (e) => {
-    e.stopPropagation();
-});
+    // Native file input change listener with required diagnostic logging
+    fileInput.addEventListener("change", (e) => {
+        console.log("[DEBUG] file input change fired");
+        console.log("[DEBUG] files:", e.target.files);
+        console.log("[DEBUG] selected file:", e.target.files?.[0]);
 
-// Native file input change listener
-fileInput.addEventListener("change", (e) => {
-    try {
-        console.log("[Image Resizer] Native fileInput change event triggered!", e.target.files);
         const file = e.target.files && e.target.files[0];
         if (file) {
             handleFileSelect(file);
         } else {
-            console.warn("[Image Resizer] fileInput change event fired with 0 files.");
+            console.warn("[DEBUG] file input change fired but no file present.");
         }
-    } catch (err) {
-        console.error("[Image Resizer] Error in fileInput change listener:", err);
-    }
-});
+    });
+}
 
 // Drag & Drop Listeners
-["dragenter", "dragover"].forEach((eventName) => {
-    dropZone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.add("dragover");
+if (dropZone) {
+    ["dragenter", "dragover"].forEach((eventName) => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.add("dragover");
+        });
     });
-});
 
-["dragleave", "drop"].forEach((eventName) => {
-    dropZone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.remove("dragover");
+    ["dragleave", "drop"].forEach((eventName) => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove("dragover");
+        });
     });
-});
 
-dropZone.addEventListener("drop", (e) => {
-    try {
-        e.preventDefault();
-        e.stopPropagation();
-        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-        if (file) {
-            console.log("[Image Resizer] File dropped:", file.name, file.size, file.type);
-            handleFileSelect(file);
+    dropZone.addEventListener("drop", (e) => {
+        try {
+            e.preventDefault();
+            e.stopPropagation();
+            const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            console.log("[DEBUG] file dropped:", file);
+            if (file) {
+                handleFileSelect(file);
+            }
+        } catch (err) {
+            console.error("[DEBUG] Error handling dropped file:", err);
         }
-    } catch (err) {
-        console.error("[Image Resizer] Error in drop listener:", err);
-    }
-});
+    });
+}
 
-btnRemoveFile.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    resetFileSelection();
-});
+if (btnRemoveFile) {
+    btnRemoveFile.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        resetFileSelection();
+    });
+}
 
-btnUpload.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    processImageUpload();
-});
+if (btnUpload) {
+    btnUpload.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        processImageUpload();
+    });
+}
 
-btnCopyJson.addEventListener("click", () => {
-    navigator.clipboard.writeText(jsonOutput.innerText);
-    btnCopyJson.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
-    setTimeout(() => {
-        btnCopyJson.innerHTML = '<i class="fa-regular fa-copy"></i> Copy JSON';
-    }, 2000);
-});
+if (btnCopyJson) {
+    btnCopyJson.addEventListener("click", () => {
+        if (jsonOutput) {
+            navigator.clipboard.writeText(jsonOutput.innerText);
+            btnCopyJson.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+            setTimeout(() => {
+                btnCopyJson.innerHTML = '<i class="fa-regular fa-copy"></i> Copy JSON';
+            }, 2000);
+        }
+    });
+}
 
 // File Selection Handler
 function handleFileSelect(file) {
+    console.log("[DEBUG] handleFileSelect received file:", file);
     if (!file) {
-        console.error("[Image Resizer] handleFileSelect received null/undefined file.");
+        console.error("[DEBUG] handleFileSelect called with invalid/null file.");
         return;
     }
 
-    console.log(`[Image Resizer] Processing file selection: ${file.name} (${file.size} bytes, type: ${file.type})`);
+    console.log(`[DEBUG] Processing file: ${file.name} (${file.size} bytes, type: ${file.type})`);
 
     // Validate MIME type & file extension
     const validMimes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
     const isExtValid = /\.(jpg|jpeg|png|webp)$/i.test(file.name);
     const isMimeValid = file.type ? validMimes.includes(file.type.toLowerCase()) : false;
 
+    console.log("[DEBUG] File validation result:", { name: file.name, isExtValid, isMimeValid });
+
     if (!isExtValid && !isMimeValid) {
         const errMsg = `Invalid file type for "${file.name}". Please select a JPG, PNG, or WEBP image.`;
-        console.error(`[Image Resizer] Validation Error: ${errMsg}`);
+        console.error(`[DEBUG] Validation Error: ${errMsg}`);
         showAlert("error", errMsg);
         return;
     }
@@ -171,49 +196,53 @@ function handleFileSelect(file) {
     // Validate size (< 10MB)
     if (file.size > 10 * 1024 * 1024) {
         const errMsg = `File size (${formatBytes(file.size)}) exceeds 10MB limit.`;
-        console.error(`[Image Resizer] Validation Error: ${errMsg}`);
+        console.error(`[DEBUG] Validation Error: ${errMsg}`);
         showAlert("error", errMsg);
         return;
     }
 
-    // Update state
+    // Store in application state variable
     currentFile = file;
 
-    // Update file details in UI
-    selectedFileName.textContent = file.name;
-    selectedFileSize.textContent = formatBytes(file.size);
+    // Update UI text details
+    if (selectedFileName) selectedFileName.textContent = file.name;
+    if (selectedFileSize) selectedFileSize.textContent = formatBytes(file.size);
 
     // Generate instant preview thumbnail
-    try {
-        const objectUrl = URL.createObjectURL(file);
-        if (selectedFilePreview) {
+    if (selectedFilePreview) {
+        try {
+            const objectUrl = URL.createObjectURL(file);
             selectedFilePreview.src = objectUrl;
             selectedFilePreview.classList.remove("hidden");
+            console.log("[DEBUG] Instant preview ObjectURL set:", objectUrl);
+        } catch (err) {
+            console.warn("[DEBUG] Error generating ObjectURL for preview:", err);
         }
-        if (selectedFileIcon) {
-            selectedFileIcon.classList.add("hidden");
-        }
-    } catch (err) {
-        console.warn("[Image Resizer] Could not create ObjectURL for preview:", err);
+    }
+    if (selectedFileIcon) {
+        selectedFileIcon.classList.add("hidden");
     }
 
     // Update UI visibility
-    dropZoneContent.classList.add("hidden");
-    selectedFileInfo.classList.remove("hidden");
+    if (dropZoneContent) dropZoneContent.classList.add("hidden");
+    if (selectedFileInfo) selectedFileInfo.classList.remove("hidden");
 
-    // Enable Upload Button
-    btnUpload.disabled = false;
+    // Enable Upload & Resize Image button
+    if (btnUpload) {
+        btnUpload.disabled = false;
+        console.log("[DEBUG] Upload button enabled: btnUpload.disabled =", btnUpload.disabled);
+    }
+
     hideAlert();
-
-    console.log("[Image Resizer] File selection successful! Upload & Resize button is ENABLED.");
+    console.log("[DEBUG] handleFileSelect complete. UI successfully updated.");
 }
 
 function resetFileSelection() {
-    console.log("[Image Resizer] Resetting file selection.");
+    console.log("[DEBUG] Resetting file selection.");
     currentFile = null;
-    fileInput.value = "";
-    selectedFileName.textContent = "";
-    selectedFileSize.textContent = "";
+    if (fileInput) fileInput.value = "";
+    if (selectedFileName) selectedFileName.textContent = "";
+    if (selectedFileSize) selectedFileSize.textContent = "";
 
     if (selectedFilePreview) {
         selectedFilePreview.src = "";
@@ -223,22 +252,26 @@ function resetFileSelection() {
         selectedFileIcon.classList.remove("hidden");
     }
 
-    dropZoneContent.classList.remove("hidden");
-    selectedFileInfo.classList.add("hidden");
-    btnUpload.disabled = true;
+    if (dropZoneContent) dropZoneContent.classList.remove("hidden");
+    if (selectedFileInfo) selectedFileInfo.classList.add("hidden");
+    if (btnUpload) btnUpload.disabled = true;
     hideAlert();
-    resultsSection.classList.add("hidden");
+    if (resultsSection) resultsSection.classList.add("hidden");
 }
 
 // Upload & Process Workflow
 async function processImageUpload() {
     if (!currentFile) {
-        console.error("[Image Resizer] processImageUpload called without currentFile.");
+        console.error("[DEBUG] processImageUpload called without currentFile.");
         return;
     }
 
     try {
-        btnUpload.disabled = true;
+        if (!supabase) {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        }
+
+        if (btnUpload) btnUpload.disabled = true;
         showStatus("Uploading original image to Supabase Storage...", 25);
         hideAlert();
 
@@ -248,7 +281,7 @@ async function processImageUpload() {
         const sanitizedName = fileNameWithoutExt.replace(/[^a-zA-Z0-9_-]/g, "_");
         const uploadPath = `uploads/${sanitizedName}_${Date.now()}.${fileExt}`;
 
-        console.log(`[Image Resizer] Uploading ${currentFile.name} to ${uploadPath}...`);
+        console.log(`[DEBUG] Uploading ${currentFile.name} to ${uploadPath}...`);
 
         // 2. Upload file to Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -262,7 +295,7 @@ async function processImageUpload() {
             throw new Error(`Storage upload failed: ${uploadError.message}`);
         }
 
-        console.log(`[Image Resizer] Upload success. Remote path: ${uploadData.path}`);
+        console.log(`[DEBUG] Upload success. Remote path: ${uploadData.path}`);
         showStatus("Invoking Edge Function 'image-resizer'...", 60);
 
         // 3. Invoke Supabase Edge Function 'image-resizer'
@@ -285,7 +318,7 @@ async function processImageUpload() {
             throw new Error(result.error || result.details || "Edge function processing failed.");
         }
 
-        console.log("[Image Resizer] Edge Function returned success:", result);
+        console.log("[DEBUG] Edge Function returned success:", result);
         showStatus("Processing complete! Rendering metrics...", 100);
 
         // 4. Render Results
@@ -293,61 +326,63 @@ async function processImageUpload() {
         showAlert("success", "Image successfully uploaded, resized to max 1200px, and compressed!");
 
     } catch (err) {
-        console.error("[Image Resizer] Processing Error:", err);
+        console.error("[DEBUG] Processing Error:", err);
         showAlert("error", err.message || "An unexpected error occurred.");
     } finally {
         setTimeout(() => {
-            statusContainer.classList.add("hidden");
-            btnUpload.disabled = false;
+            if (statusContainer) statusContainer.classList.add("hidden");
+            if (btnUpload) btnUpload.disabled = false;
         }, 1200);
     }
 }
 
 // Display Processing Results
 function displayResults(data) {
-    resultsSection.classList.remove("hidden");
+    if (resultsSection) resultsSection.classList.remove("hidden");
 
     // Summary Cards
-    summarySpaceSaved.textContent = data.metrics.compressionPercentage;
-    summarySizeSaved.textContent = data.metrics.bytesSavedFormatted;
+    if (summarySpaceSaved) summarySpaceSaved.textContent = data.metrics.compressionPercentage;
+    if (summarySizeSaved) summarySizeSaved.textContent = data.metrics.bytesSavedFormatted;
 
     // Original Details
-    imgOriginalPreview.src = data.original.url;
-    metaOrigSize.textContent = data.original.sizeFormatted;
-    metaOrigDimensions.textContent = `${data.original.dimensions.width} x ${data.original.dimensions.height} px`;
-    metaOrigPath.textContent = data.original.path;
+    if (imgOriginalPreview) imgOriginalPreview.src = data.original.url;
+    if (metaOrigSize) metaOrigSize.textContent = data.original.sizeFormatted;
+    if (metaOrigDimensions) metaOrigDimensions.textContent = `${data.original.dimensions.width} x ${data.original.dimensions.height} px`;
+    if (metaOrigPath) metaOrigPath.textContent = data.original.path;
 
     // Optimized Details
-    imgOptimizedPreview.src = data.optimized.url;
-    metaOptSize.textContent = data.optimized.sizeFormatted;
-    metaOptDimensions.textContent = `${data.optimized.dimensions.width} x ${data.optimized.dimensions.height} px`;
-    metaOptPath.textContent = data.optimized.path;
-    badgeCompression.textContent = `Saved ${data.metrics.compressionPercentage}`;
-    btnDownloadOptimized.href = data.optimized.url;
+    if (imgOptimizedPreview) imgOptimizedPreview.src = data.optimized.url;
+    if (metaOptSize) metaOptSize.textContent = data.optimized.sizeFormatted;
+    if (metaOptDimensions) metaOptDimensions.textContent = `${data.optimized.dimensions.width} x ${data.optimized.dimensions.height} px`;
+    if (metaOptPath) metaOptPath.textContent = data.optimized.path;
+    if (badgeCompression) badgeCompression.textContent = `Saved ${data.metrics.compressionPercentage}`;
+    if (btnDownloadOptimized) btnDownloadOptimized.href = data.optimized.url;
 
     // JSON Dump
-    jsonOutput.textContent = JSON.stringify(data, null, 2);
+    if (jsonOutput) jsonOutput.textContent = JSON.stringify(data, null, 2);
 
     // Scroll smoothly to results
-    resultsSection.scrollIntoView({ behavior: "smooth" });
+    if (resultsSection) resultsSection.scrollIntoView({ behavior: "smooth" });
 }
 
 // UI Helper Functions
 function showStatus(text, percentage) {
-    statusContainer.classList.remove("hidden");
-    statusText.textContent = text;
-    statusPercentage.textContent = `${percentage}%`;
-    progressBarFill.style.width = `${percentage}%`;
+    if (statusContainer) statusContainer.classList.remove("hidden");
+    if (statusText) statusText.textContent = text;
+    if (statusPercentage) statusPercentage.textContent = `${percentage}%`;
+    if (progressBarFill) progressBarFill.style.width = `${percentage}%`;
 }
 
 function showAlert(type, message) {
-    alertBox.className = `alert ${type}`;
-    alertMessage.textContent = message;
-    alertBox.classList.remove("hidden");
+    if (alertBox) {
+        alertBox.className = `alert ${type}`;
+        if (alertMessage) alertMessage.textContent = message;
+        alertBox.classList.remove("hidden");
+    }
 }
 
 function hideAlert() {
-    alertBox.classList.add("hidden");
+    if (alertBox) alertBox.classList.add("hidden");
 }
 
 function formatBytes(bytes, decimals = 2) {
